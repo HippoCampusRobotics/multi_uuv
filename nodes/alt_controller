@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+import rospy
+import threading
+import math
+from hippocampus_common.node import Node
+from hippocampus_common.tf_helper import TfHelper
+from multi_uuv import simple_pid
+from multi_uuv.msg import AltControlDebug
+import tf2_geometry_msgs
+import tf.transformations
+from std_msgs.msg import Float64
+from geometry_msgs.msg import PointStamped, PoseStamped
+
+
+class AltControllerNode(Node):
+    def __init__(self, name):
+        super(AltControllerNode, self).__init__(name)
+        self.data_lock = threading.RLock()
+        self.tf_helper = TfHelper()
+        self.altitude_setpoint = -0.5
+        self.look_ahead_dist = 2.0
+        self.controller = simple_pid.Controller(p_gain=1)
+        self.t_last = rospy.Time.now()
+
+        self.pitch_publisher = rospy.Publisher("~control_output",
+                                               Float64,
+                                               queue_size=1)
+
+        self.debug_publisher = rospy.Publisher("~debug",
+                                               AltControlDebug,
+                                               queue_size=1)
+
+        rospy.Subscriber("mavros/local_position/pose", PoseStamped,
+                         self.on_pose)
+        rospy.Subscriber("~altitude_setpoint", PointStamped,
+                         self.on_altitude_setpoint)
+
+    def on_pose(self, msg):
+        with self.data_lock:
+            dt = msg.header.stamp - self.t_last
+            dt = dt.to_sec()
+            self.t_last = msg.header.stamp
+            height_err = msg.pose.position.z - self.altitude_setpoint
+            pitch_desired = math.atan2(height_err, self.look_ahead_dist)
+        quat = [
+            msg.pose.orientation.x, msg.pose.orientation.y,
+            msg.pose.orientation.z, msg.pose.orientation.w
+        ]
+        rpy = tf.transformations.euler_from_quaternion(quat)
+        pitch_error = pitch_desired - rpy[1]
+        u = self.controller.update(pitch_error, dt)
+        msg = Float64(u)
+        self.pitch_publisher.publish(msg)
+
+        msg = AltControlDebug(altitude_setpoint=self.altitude_setpoint,
+                              altitude_error=height_err,
+                              pitch_error=pitch_error,
+                              pitch_desired=pitch_desired,
+                              output=u)
+        msg.header.stamp = rospy.Time.now()
+        self.debug_publisher.publish(msg)
+
+    def on_altitude_setpoint(self, msg):
+        transform = self.tf_helper.tf_buffer.lookup_transform(
+            target_frame="map",
+            source_frame=msg.header.frame_id,
+            time=rospy.Time(0),
+            timeout=rospy.Duration(1))
+
+        point = tf2_geometry_msgs.do_transform_point(msg, transform)
+        with self.data_lock:
+            self.altitude_setpoint = point.point.z
+
+
+def main():
+    node = AltControllerNode("alt_controller")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

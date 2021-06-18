@@ -1,0 +1,173 @@
+#!/usr/bin/env python
+
+import rospy
+import re
+import threading
+import numpy as np
+import tf.transformations
+from multi_uuv.srv import SetValue, SetValueResponse
+from hippocampus_common.node import Node
+from std_msgs.msg import Float64
+from geometry_msgs.msg import PoseStamped, TwistStamped
+from multi_uuv.msg import PoseIdArray
+from multi_uuv import leaderless_circle
+
+UUV_STATE_LOST = 0
+UUV_STATE_MAYBE_LOST = 1
+UUV_STATE_ACTIVE = 2
+
+
+class LlcNode(Node):
+    def __init__(self):
+        super(LlcNode, self).__init__("leaderless_circle")
+
+        self.uuv_id = self.get_uuv_id()
+
+        self.data_lock = threading.RLock()
+
+        if self.uuv_id is None:
+            raise ValueError("No valid value for UUV ID")
+
+        rospy.loginfo("[%s] Using ID: %d", rospy.get_name(), self.uuv_id)
+
+        self.rate_publisher = rospy.Publisher("~control_output",
+                                              Float64,
+                                              queue_size=1)
+        self.speed = 0.1
+        self.poses = {}
+        self.own_pose = {}
+        self.diameter = 4.0
+        self._omega_0 = self.speed / self.diameter * 2
+        self.gain = 1.0
+
+        rospy.Service("~set_gain", SetValue, self.on_set_gain)
+        rospy.Service("~set_diameter", SetValue, self.on_set_diameter)
+
+        self.pose_observer_subscriber = rospy.Subscriber(
+            "pose_observer/observation",
+            PoseIdArray,
+            self.on_observer_pose,
+            queue_size=1)
+
+        self.pose_subscriber = rospy.Subscriber("mavros/local_position/pose",
+                                                PoseStamped,
+                                                self.on_pose,
+                                                queue_size=1)
+
+        self.velocity_subscriber = rospy.Subscriber(
+            "mavros/local_position/velocity_body", TwistStamped,
+            self.on_velocity)
+
+        self.lost_timer = rospy.timer.Timer(rospy.Duration(1), self.check_lost)
+
+    def on_set_gain(self, req):
+        with self.data_lock:
+            self.gain = req.real
+            return SetValueResponse(success=True)
+
+    def on_set_diameter(self, req):
+        with self.data_lock:
+            self.diameter = req.real
+            return SetValueResponse(success=True)
+
+    def on_velocity(self, msg):
+        v_lin = msg.twist.linear
+        with self.data_lock:
+            self.speed = np.linalg.norm(np.array([v_lin.x, v_lin.y, v_lin.z]))
+            rospy.logwarn_throttle(1.0, "speed: %.2f", self.speed)
+            self._omega_0 = self.speed / self.diameter * 2
+
+    def check_lost(self, event):
+        with self.data_lock:
+            for uuv_id in self.poses:
+                if self.poses[uuv_id]["state"] == UUV_STATE_ACTIVE:
+                    self.poses[uuv_id]["state"] = UUV_STATE_MAYBE_LOST
+                elif self.poses[uuv_id]["state"] == UUV_STATE_MAYBE_LOST:
+                    self.poses[uuv_id]["state"] = UUV_STATE_LOST
+                    rospy.logwarn("Lost UUV with ID: %d", uuv_id)
+
+    def on_pose(self, msg):
+        position = np.array([msg.pose.position.x, msg.pose.position.y])
+        quat = (msg.pose.orientation.x, msg.pose.orientation.y,
+                msg.pose.orientation.z, msg.pose.orientation.w)
+        euler = tf.transformations.euler_from_quaternion(quat)
+        yaw = euler[2]
+        with self.data_lock:
+            self.own_pose = {
+                "position": position,
+                "yaw": yaw,
+                "state": UUV_STATE_ACTIVE
+            }
+        yaw_rate = self.update_control()
+        self.publish_control_output(yaw_rate)
+
+    def publish_control_output(self, yaw_rate):
+        msg = Float64()
+        msg.data = yaw_rate
+        self.rate_publisher.publish(msg)
+
+    def on_observer_pose(self, msg):
+        for pose in msg.poses:
+            uuv_id = pose.id
+            position = np.array([pose.pose.position.x, pose.pose.position.y])
+            quat = (pose.pose.orientation.x, pose.pose.orientation.y,
+                    pose.pose.orientation.z, pose.pose.orientation.w)
+            euler = tf.transformations.euler_from_quaternion(quat)
+            yaw = euler[2]
+            with self.data_lock:
+                self.poses[uuv_id] = {
+                    "position": position,
+                    "yaw": yaw,
+                    "state": UUV_STATE_ACTIVE
+                }
+
+    def get_uuv_id(self):
+        name = rospy.get_namespace().replace("/", "")
+        ids = re.findall(r"\d+", name)
+        ids = [int(x) for x in ids]
+        n_ids = len(ids)
+
+        if n_ids < 1:
+            rospy.logerr(
+                "[%s] Could not identify my ID from my namespace. "
+                "Shutting down.", name)
+            rospy.signal_shutdown("Could not identify ID")
+            return None
+        if n_ids > 1:
+            rospy.logwarn(
+                "There is more than one ID identified from my namespace. "
+                "Using ID: %d", ids[0])
+        return ids[0]
+
+    def get_position_yaw(self):
+        r_vecs = []
+        yaws = []
+        with self.data_lock:
+            for uuv_id in self.poses:
+                if not self.poses[uuv_id]["state"] == UUV_STATE_LOST:
+                    r_vecs.append(self.poses[uuv_id]["position"])
+                    yaws.append(self.poses[uuv_id]["yaw"])
+        return r_vecs, yaws
+
+    def update_control(self):
+        positions, yaws = self.get_position_yaw()
+        positions.insert(0, self.own_pose["position"])
+        yaws.insert(0, self.own_pose["yaw"])
+        yaw_rate = leaderless_circle.compute_control_output(
+            vehicle_id=0,
+            omega_0=self._omega_0,
+            gain=self.gain,
+            n_vehicles=len(yaws),
+            vel_abs=self.speed,
+            r_vecs=positions,
+            yaws=yaws)
+        return yaw_rate
+
+
+def main():
+    node = LlcNode()
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

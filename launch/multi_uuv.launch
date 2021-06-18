@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="world" default="$(find mavlink_sitl_gazebo)/worlds/uuv_hippocampus.world" />
+    <!-- gazebo configs -->
+    <arg name="gui" default="true" />
+    <arg name="debug" default="false" />
+    <arg name="verbose" default="false" />
+    <arg name="paused" default="false" />
+    <!-- Gazebo sim -->
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="gui" value="$(arg gui)" />
+        <arg name="world_name" value="$(arg world)" />
+        <arg name="debug" value="$(arg debug)" />
+        <arg name="verbose" value="$(arg verbose)" />
+        <arg name="paused" value="$(arg paused)" />
+    </include>
+    <!-- <arg name="tank_sdf" value="$(find px4)/Tools/sitl_gazebo/models/uuv_apriltag_tank/model.sdf" />
+    <node name="spawner" pkg="gazebo_ros" type="spawn_model" args="-sdf -f $(arg tank_sdf) -model uuv_apriltag_tank -x 1.62 -y 3.27431 -Y 3.1415" /> -->
+</launch>

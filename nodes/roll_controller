@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+
+import rospy
+from hippocampus_common import node
+from std_msgs.msg import Float64
+from geometry_msgs.msg import PoseStamped
+import tf.transformations
+from multi_uuv.simple_pid import Controller
+
+
+class RollControlNode(node.Node):
+    def __init__(self, name):
+        super(RollControlNode, self).__init__(name)
+        self.roll_setpoint = 0.0
+        self.t_last = rospy.Time.now()
+        self.controller = Controller()
+        self.roll_rate_publisher = rospy.Publisher("~control_output",
+                                                   Float64,
+                                                   queue_size=1)
+        rospy.Subscriber("~roll_setpoint",
+                         Float64,
+                         self.on_roll_setpoint,
+                         queue_size=1)
+        rospy.Subscriber("mavros/local_position/pose",
+                         PoseStamped,
+                         self.on_pose,
+                         queue_size=1)
+
+    def on_roll_setpoint(self, msg):
+        self.roll_setpoint = msg.data
+
+    def on_pose(self, msg):
+        dt = msg.header.stamp - self.t_last
+        dt = dt.to_sec()
+        quat = [
+            msg.pose.orientation.x, msg.pose.orientation.y,
+            msg.pose.orientation.z, msg.pose.orientation.w
+        ]
+        rpy = tf.transformations.euler_from_quaternion(quat)
+        error = self.roll_setpoint - rpy[0]
+        u = self.controller.update(error, dt)
+        self.roll_rate_publisher.publish(Float64(u))
+
+
+def main():
+    node = RollControlNode("roll_controller")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

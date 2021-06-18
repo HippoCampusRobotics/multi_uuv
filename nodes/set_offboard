@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+
+import rospy
+import sys
+
+from mavros_msgs.srv import SetMode, SetModeRequest
+
+
+def main(argv):
+    for arg in argv:
+        try:
+            uuv_namespace = "uuv{:02d}".format(int(arg))
+        except ValueError as e:
+            print(e)
+            print("Could not arm vehicle with arg: {}".format(arg))
+            continue
+        try:
+            proxy = rospy.ServiceProxy(
+                "/{}/mavros/set_mode".format(uuv_namespace), SetMode)
+            req = SetModeRequest(custom_mode="OFFBOARD")
+            response = proxy(req)
+        except rospy.ServiceException as e:
+            print("SetMode failed: {}".format(e))
+        else:
+            print("Set OFFBOARD for {}".format(uuv_namespace))
+            print("{}".format(response))
+
+    print("Finished!")
+
+
+if __name__ == "__main__":
+    main(rospy.myargv(sys.argv))

@@ -1,0 +1,12 @@
+<launch>
+    <arg name="vehicle_name" />
+
+    <group ns="$(arg vehicle_name)">
+        <node pkg="hippocampus_common" type="rpy_to_att_target_node" name="rpy_to_att_target" output="screen">
+            <remap from="out" to="mavros/setpoint_raw/attitude" />
+        </node>
+
+        <include file="$(find hippolink_ros)/launch/transceiver.launch"></include>
+
+    </group>
+</launch>

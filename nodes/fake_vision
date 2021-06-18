@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+
+import rospy
+
+from hippocampus_common.node import Node
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseStamped
+
+
+class FakeVisionNode(Node):
+    def __init__(self):
+        super(FakeVisionNode, self).__init__("fake_vision")
+        self.vision_publisher = rospy.Publisher("mavros/vision_pose/pose",
+                                                PoseStamped,
+                                                queue_size=1)
+        rospy.Subscriber("ground_truth/state",
+                         Odometry,
+                         self.ground_truth_callback,
+                         queue_size=1)
+
+    def ground_truth_callback(self, msg):
+        output = PoseStamped()
+        output.header.stamp = msg.header.stamp
+        output.pose.position = msg.pose.pose.position
+        output.pose.orientation = msg.pose.pose.orientation
+
+        self.vision_publisher.publish(output)
+
+
+def main():
+    node = FakeVisionNode()
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,6 @@
+Header header
+float64 altitude_setpoint
+float64 altitude_error
+float64 pitch_error
+float64 pitch_desired
+float64 output

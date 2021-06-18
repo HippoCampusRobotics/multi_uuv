@@ -1,0 +1,102 @@
+#!/usr/bin/env python
+
+import rospy
+import threading
+import numpy as np
+from hippocampus_common.node import Node
+from std_msgs.msg import Float64
+from geometry_msgs.msg import PoseStamped
+from mavros_msgs.msg import AttitudeTarget
+import tf.transformations
+
+
+class UnifierNode(Node):
+    def __init__(self, name):
+        super(UnifierNode, self).__init__(name)
+
+        self.data_lock = threading.RLock()
+
+        self.attitude_pub = rospy.Publisher("mavros/setpoint_raw/attitude",
+                                            AttitudeTarget,
+                                            queue_size=1)
+
+        self.attitude_target = AttitudeTarget()
+        self.attitude_target.type_mask = AttitudeTarget.IGNORE_ATTITUDE
+
+        self.rpy_target = np.array([0, 0, 0], dtype=np.float64)
+        self.thrust = 0.8
+
+        self.yaw_rate_sub = rospy.Subscriber("~yaw_rate_target", Float64,
+                                             self.on_yaw_rate_target)
+        self.roll_rate_sub = rospy.Subscriber("~roll_rate_target", Float64,
+                                              self.on_roll_rate_target)
+        self.pitch_rate_sub = rospy.Subscriber("~pitch_rate_target", Float64,
+                                               self.on_pitch_rate_target)
+        self.thrust_sub = rospy.Subscriber("~thrust_target", Float64,
+                                           self.on_thrust_target)
+
+        self.pose_sub = rospy.Subscriber("mavros/local_position/pose",
+                                         PoseStamped, self.on_pose)
+
+    def on_yaw_rate_target(self, msg):
+        with self.data_lock:
+            self.rpy_target[2] = msg.data
+
+    def on_roll_rate_target(self, msg):
+        with self.data_lock:
+            self.rpy_target[0] = msg.data
+
+    def on_pitch_rate_target(self, msg):
+        with self.data_lock:
+            self.rpy_target[1] = msg.data
+
+    def on_thrust_target(self, msg):
+        with self.data_lock:
+            self.thrust = msg.data
+
+    def apply_body_rpy(self, rpy):
+        with self.data_lock:
+            self.attitude_target.thrust = self.thrust
+            rates = (self.pitch_from_roll(self.rpy_target[1], rpy[0]) +
+                     self.yaw_from_roll(self.rpy_target[2], rpy[0]))
+            rates[0] = self.rpy_target[0]
+            rospy.logwarn_throttle(1.0, "target: %s", self.rpy_target)
+            rospy.logwarn_throttle(
+                1.0, "pitch conv: %s",
+                self.pitch_from_roll(self.rpy_target[1], rpy[0]))
+            rospy.logwarn_throttle(
+                1.0, "yaw conv: %s",
+                self.yaw_from_roll(self.rpy_target[2], rpy[0]))
+            rospy.logwarn_throttle(1.0, "roll angle: %s", rpy[0])
+
+            (self.attitude_target.body_rate.x, self.attitude_target.body_rate.y,
+             self.attitude_target.body_rate.z) = rates
+
+    def pitch_from_roll(self, pitch_rate, roll):
+        pitch = np.cos(roll) * pitch_rate
+        yaw = -np.sin(roll) * pitch_rate
+        return np.array([0, pitch, yaw], dtype=np.float64)
+
+    def yaw_from_roll(self, yaw_rate, roll):
+        yaw = np.cos(roll) * yaw_rate
+        pitch = np.sin(roll) * yaw_rate
+        return np.array([0, pitch, yaw], dtype=np.float64)
+
+    def on_pose(self, msg):
+        quat = msg.pose.orientation
+        self.apply_body_rpy(
+            tf.transformations.euler_from_quaternion(
+                [quat.x, quat.y, quat.z, quat.w]))
+        try:
+            self.attitude_pub.publish(self.attitude_target)
+        except rospy.ROSException:
+            pass
+
+
+def main():
+    node = UnifierNode("control_unifier")
+    node.run()
+
+
+if __name__ == "__main__":
+    main()

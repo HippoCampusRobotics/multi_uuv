@@ -1,0 +1,87 @@
+#!/usr/bin/env python
+
+import rospy
+import threading
+import re
+from hippocampus_common.node import Node
+from geometry_msgs.msg import PoseStamped
+from multi_uuv.msg import PoseIdArray, PoseId
+
+
+class PoseObserverNode(Node):
+    def __init__(self):
+        super(PoseObserverNode, self).__init__("pose_observer")
+        self.is_sim = self.get_param("sim", False)
+
+        self.data_lock = threading.RLock()
+
+        self.uuv_id = self.get_uuv_id()
+
+        if self.uuv_id is None:
+            raise ValueError("No valid value for UUV ID")
+
+        if self.is_sim:
+            self.init_sim()
+
+        self.observation_publisher = rospy.Publisher("~observation",
+                                                     PoseIdArray,
+                                                     queue_size=1)
+        self.poses = {}
+        self.publish_timer = rospy.Timer(rospy.Duration(0.1),
+                                         self.publish_observation)
+
+    def init_sim(self):
+        self.uuv_list = self.get_param("uuv_list", [])
+        self.uuv_list.remove(self.uuv_id)
+        self.pose_subscriber = {}
+        for uuv_id in self.uuv_list:
+            self.pose_subscriber[uuv_id] = rospy.Subscriber(
+                "/uuv{:02d}/mavros/local_position/pose".format(uuv_id),
+                PoseStamped,
+                self.pose_callback,
+                callback_args=uuv_id,
+                queue_size=1)
+
+    def pose_callback(self, msg, uuv_id):
+        with self.data_lock:
+            self.poses[uuv_id] = {"pose": msg.pose, "updated": True}
+
+    def publish_observation(self, event):
+        msg = PoseIdArray()
+        msg.header.stamp = rospy.Time.now()
+        with self.data_lock:
+            for uuv_id in self.poses:
+                if self.poses[uuv_id]["updated"]:
+                    pose = PoseId()
+                    pose.id = uuv_id
+                    pose.pose = self.poses[uuv_id]["pose"]
+                    self.poses[uuv_id]["updated"] = False
+                    msg.poses.append(pose)
+        self.observation_publisher.publish(msg)
+
+    def get_uuv_id(self):
+        name = rospy.get_namespace().replace("/", "")
+        ids = re.findall(r"\d+", name)
+        ids = [int(x) for x in ids]
+        n_ids = len(ids)
+
+        if n_ids < 1:
+            rospy.logerr(
+                "[%s] Could not identify my ID from my namespace. "
+                "Shutting down.", name)
+            rospy.signal_shutdown("Could not identify ID")
+            return None
+        if n_ids > 1:
+            rospy.logwarn(
+                "There is more than one ID identified from my namespace. "
+                "Using ID: %d", ids[0])
+        return ids[0]
+
+
+def main():
+    node = PoseObserverNode()
+    node.run()
+
+
+if __name__ == "__main__":
+    main()
