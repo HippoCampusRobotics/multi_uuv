@@ -1,0 +1,15 @@
+<launch>
+    <arg name="vehicle_name" />
+
+    <arg name="fake_transceiver" />
+
+    <group ns="$(arg vehicle_name)">
+        <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
+        <include file="$(find control)/launch/attitude_control.launch">
+            <arg name="use_ground_truth" value="false" />
+        </include>
+        <include file="$(find hippolink_ros)/launch/transceiver.launch">
+            <arg name="fake_transceiver" value="$(arg fake_transceiver)" />
+        </include>
+    </group>
+</launch>

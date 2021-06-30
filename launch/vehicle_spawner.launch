@@ -1,15 +1,14 @@
 <launch>
-    <arg name="est" default="ekf2" />
     <arg name="vehicle" default="uuv_hippocampus" />
     <arg name="id" default="0" />
     <arg name="namespace" value="$(eval 'uuv{:02d}'.format(arg('id')))" />
 
-    <arg name="y" default="$(eval arg('id') * 3 * (-1)**(arg('id') % 2))" />
+    <arg name="y" default="0" />
     <arg name="x" default="0" />
     <arg name="z" default="0" />
     <arg name="R" default="0" />
     <arg name="P" default="0" />
-    <arg name="Y" default="$(eval (arg('id') % 2) * 3.14)" />
+    <arg name="Y" default="0" />
 
     <group ns="$(arg namespace)">
         <!-- MAVROS and vehicle configs -->
@@ -20,16 +19,13 @@
 
         <param name="test" value="$(arg fcu_url)" />
         <!-- PX4 SITL and vehicle spawn -->
-        <include file="$(find px4)/launch/single_vehicle_spawn_sdf.launch">
+        <include file="$(find hippocampus_sim)/launch/spawn_uuv_hippocampus.launch">
             <arg name="x" value="$(arg x)" />
             <arg name="y" value="$(arg y)" />
             <arg name="z" value="$(arg z)" />
             <arg name="R" value="$(arg R)" />
             <arg name="P" value="$(arg P)" />
             <arg name="Y" value="$(arg Y)" />
-            <arg name="vehicle" value="$(arg vehicle)" />
-            <arg name="mavlink_udp_port" value="$(arg mavlink_udp_port)" />
-            <arg name="mavlink_tcp_port" value="$(arg mavlink_tcp_port)" />
             <arg name="ID" value="$(arg id)" />
         </include>
         <!-- MAVROS -->
@@ -40,20 +36,9 @@
             <arg name="tgt_component" value="1" />
         </include>
 
-        <!-- <node name="yaw_controller" pkg="multi_uuv" type="leaderless_circle" /> -->
-        <!-- <node name="pitch_controller" pkg="multi_uuv" type="alt_controller" />
-        <node name="roll_controller" pkg="multi_uuv" type="roll_controller" />
-        <node name="control_unifier" pkg="multi_uuv" type="control_unifier">
-            <remap from="~yaw_rate_target" to="yaw_controller/control_output" />
-            <remap from="~pitch_rate_target" to="pitch_controller/control_output" />
-            <remap from="~roll_rate_target" to="roll_controller/control_output" />
-        </node> -->
-        <node name="pose_observer" pkg="multi_uuv" type="pose_observer" />
         <param name="sim" value="true" />
         <node name="fake_vision" pkg="multi_uuv" type="fake_vision" />
         <rosparam command="load" file="$(find multi_uuv)/config/uuv_list.yaml" />
-
-        <node name="tf_node" pkg="hippocampus_common" type="tf_pose_ros_to_px4_node" />
     </group>
 
 </launch>
