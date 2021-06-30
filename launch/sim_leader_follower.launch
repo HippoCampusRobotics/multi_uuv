@@ -1,0 +1,42 @@
+<launch>
+    <arg name="gui" default="true" />
+    <arg name="verbose" default="true" />
+    <arg name="rviz" default="false" />
+    <!-- start gazebo with the specified world -->
+    <include file="$(find hippocampus_sim)/launch/gazebo_base.launch">
+        <arg name="gui" value="$(arg gui)" />
+        <arg name="verbose" value="$(arg verbose)" />
+    </include>
+
+    <include file="$(find hippocampus_sim)/launch/spawn_apriltag_tank.launch" />
+
+    <!-- <arg name="rviz_config" default="$(find hippocampus_sim)/config/default.rviz" /> -->
+
+    <include file="$(find multi_uuv)/launch/vehicle_spawner.launch">
+        <arg name="id" value="2" />
+        <arg name="y" value="1" />
+    </include>
+    <group ns="uuv02">
+        <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
+        <include file="$(find control)/launch/attitude_control.launch">
+            <arg name="use_ground_truth" value="false" />
+        </include>
+        <include file="$(find hippolink_ros)/launch/transceiver.launch">
+            <arg name="fake_transceiver" value="true" />
+        </include>
+    </group>
+
+    <include file="$(find multi_uuv)/launch/vehicle_spawner.launch">
+        <arg name="id" value="3" />
+    </include>
+    <group ns="uuv03">
+        <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
+        <include file="$(find control)/launch/follow_vehicle.launch">
+            <arg name="use_ground_truth" value="false" />
+        </include>
+        <include file="$(find hippolink_ros)/launch/transceiver.launch">
+            <arg name="fake_transceiver" value="true" />
+        </include>
+    </group>
+
+</launch>
