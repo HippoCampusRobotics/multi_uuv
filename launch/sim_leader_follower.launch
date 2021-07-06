@@ -24,6 +24,7 @@
         <include file="$(find hippolink_ros)/launch/transceiver.launch">
             <arg name="fake_transceiver" value="true" />
         </include>
+        <node pkg="hippolink_ros" type="rate_watcher_node.py" name="rate_watcher" />
     </group>
 
     <include file="$(find multi_uuv)/launch/vehicle_spawner.launch">
@@ -37,6 +38,7 @@
         <include file="$(find hippolink_ros)/launch/transceiver.launch">
             <arg name="fake_transceiver" value="true" />
         </include>
+        <node pkg="hippolink_ros" type="rate_watcher_node.py" name="rate_watcher" />
     </group>
 
 </launch>
