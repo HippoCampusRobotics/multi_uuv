@@ -34,11 +34,3 @@ def get_vehicle_number():
     rospy.loginfo("Using vehicle number identified from namespace.")
     hippocampus_common.node.Node.set_param("~vehicle_number", ids[0])
     return ids[0]
-
-
-def get_path_target_name(id):
-    return "multi_uuv_path_target_{}".format(id)
-
-
-def get_pose_name(id):
-    return "multi_uuv_pose_{}".format(id)
