@@ -94,7 +94,7 @@ def main():
     for i in range(n_particles):
         particles.append(
             Particle(i, n_particles, pos=np.array([i, 0.0]), yaw=i * 3.14))
-        positions[i] = np.zeros((len(t), 2), dtype=np.float)
+        positions[i] = np.zeros((len(t), 2), dtype=float)
     for i in range(len(t)):
         poses = {}
         for j in range(n_particles):
