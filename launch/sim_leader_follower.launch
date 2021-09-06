@@ -18,8 +18,10 @@
     </include>
     <group ns="uuv02">
         <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
-        <include file="$(find control)/launch/attitude_control.launch">
+        <include file="$(find control)/launch/path_tracking.launch">
             <arg name="use_ground_truth" value="false" />
+            <arg name="use_external_controller" value="false" />
+            <arg name="path_file" value="$(find gantry_control)/config/circle_path.yaml" />
         </include>
         <include file="$(find hippolink_ros)/launch/transceiver.launch">
             <arg name="fake_transceiver" value="true" />
@@ -34,6 +36,7 @@
         <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
         <include file="$(find control)/launch/follow_vehicle.launch">
             <arg name="use_ground_truth" value="false" />
+            <arg name="path_file" value="$(find gantry_control)/config/circle_path.yaml" />
         </include>
         <include file="$(find hippolink_ros)/launch/transceiver.launch">
             <arg name="fake_transceiver" value="true" />
