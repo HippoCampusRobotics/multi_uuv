@@ -19,7 +19,7 @@
 
         <param name="test" value="$(arg fcu_url)" />
         <!-- PX4 SITL and vehicle spawn -->
-        <include file="$(find hippocampus_sim)/launch/spawn_uuv_hippocampus.launch">
+        <include file="$(find hippocampus_sim)/launch/inc_spawn_uuv_hippocampus.launch">
             <arg name="x" value="$(arg x)" />
             <arg name="y" value="$(arg y)" />
             <arg name="z" value="$(arg z)" />

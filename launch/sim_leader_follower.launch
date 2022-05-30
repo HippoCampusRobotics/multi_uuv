@@ -1,14 +1,20 @@
 <launch>
+    <arg name="use_external_controller" />
+
     <arg name="gui" default="true" />
     <arg name="verbose" default="true" />
+    <arg name="use_ground_truth_control" default="true" />
+    <arg name="path_file" value="$(find gantry_control)/config/circle_path.yaml" />
+    <!-- <arg name="path_file" value="$(find path_planning)/config/infinity_path.yaml" /> -->
+    <arg name="mixer_file" value="$(find control)/config/mixer_hippocampus_default.yaml" />
     <arg name="rviz" default="false" />
     <!-- start gazebo with the specified world -->
-    <include file="$(find hippocampus_sim)/launch/gazebo_base.launch">
+    <include file="$(find hippocampus_sim)/launch/inc_gazebo_base.launch">
         <arg name="gui" value="$(arg gui)" />
         <arg name="verbose" value="$(arg verbose)" />
     </include>
 
-    <include file="$(find hippocampus_sim)/launch/spawn_apriltag_tank.launch" />
+    <include file="$(find hippocampus_sim)/launch/inc_spawn_apriltag_tank.launch" />
 
     <!-- <arg name="rviz_config" default="$(find hippocampus_sim)/config/default.rviz" /> -->
 
@@ -17,11 +23,14 @@
         <arg name="y" value="1" />
     </include>
     <group ns="uuv02">
+        <param name="vehicle_name" value="uuv02" />
+        <param name="vehicle_type" value="hippocampus" />
         <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
         <include file="$(find control)/launch/path_tracking.launch">
-            <arg name="use_ground_truth" value="false" />
-            <arg name="use_external_controller" value="false" />
-            <arg name="path_file" value="$(find gantry_control)/config/circle_path.yaml" />
+            <arg name="use_ground_truth" value="true" />
+            <arg name="use_external_controller" value="$(arg use_external_controller)" />
+            <arg name="path_file" value="$(arg path_file)" />
+            <arg if="$(arg use_external_controller)" name="mixer_file" value="$(find control)/config/mixer_hippocampus_default.yaml" />
         </include>
         <include file="$(find hippolink_ros)/launch/transceiver.launch">
             <arg name="fake_transceiver" value="true" />
@@ -33,10 +42,14 @@
         <arg name="id" value="3" />
     </include>
     <group ns="uuv03">
+        <param name="vehicle_name" value="uuv03" />
+        <param name="vehicle_type" value="hippocampus" />
         <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
         <include file="$(find control)/launch/follow_vehicle.launch">
-            <arg name="use_ground_truth" value="false" />
-            <arg name="path_file" value="$(find gantry_control)/config/circle_path.yaml" />
+            <arg name="use_ground_truth" value="$(arg use_ground_truth_control)" />
+            <arg name="use_external_controller" value="$(arg use_external_controller)" />
+            <arg name="path_file" value="$(arg path_file)" />
+            <arg if="$(arg use_external_controller)" name="mixer_file" value="$(find control)/config/mixer_hippocampus_default.yaml" />
         </include>
         <include file="$(find hippolink_ros)/launch/transceiver.launch">
             <arg name="fake_transceiver" value="true" />
