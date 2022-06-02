@@ -2,7 +2,7 @@
     <arg name="vehicle_name" />
 
     <group ns="$(arg vehicle_name)">
-        <node pkg="multi_uuv" type="attitude_mimic.py" name="attitude_mimic" output="screen"></node>
+        <node pkg="multi_uuv" type="attitude_mimic" name="attitude_mimic" output="screen"></node>
 
         <include file="$(find hippolink_ros)/launch/transceiver.launch"></include>
     </group>

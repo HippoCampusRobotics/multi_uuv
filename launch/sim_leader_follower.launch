@@ -26,7 +26,7 @@
         <param name="vehicle_name" value="uuv02" />
         <param name="vehicle_type" value="hippocampus" />
         <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
-        <include file="$(find control)/launch/path_tracking.launch">
+        <include file="$(find control)/launch/inc_path_tracking.launch">
             <arg name="use_ground_truth" value="true" />
             <arg name="use_external_controller" value="$(arg use_external_controller)" />
             <arg name="path_file" value="$(arg path_file)" />
@@ -45,7 +45,7 @@
         <param name="vehicle_name" value="uuv03" />
         <param name="vehicle_type" value="hippocampus" />
         <node pkg="hippocampus_common" type="auto_offboard_node" name="auto_offboard" output="screen" />
-        <include file="$(find control)/launch/follow_vehicle.launch">
+        <include file="$(find control)/launch/inc_follow_vehicle.launch">
             <arg name="use_ground_truth" value="$(arg use_ground_truth_control)" />
             <arg name="use_external_controller" value="$(arg use_external_controller)" />
             <arg name="path_file" value="$(arg path_file)" />
