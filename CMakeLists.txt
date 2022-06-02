@@ -36,7 +36,7 @@ catkin_package(CATKIN_DEPENDS
   geometry_msgs)
 
 catkin_install_python(PROGRAMS
-  nodes/attitude_mimic.py
+  nodes/attitude_mimic
   nodes/fake_vision
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
